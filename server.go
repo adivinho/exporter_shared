@@ -25,11 +25,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
+	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 var (
 	sslCertFileF = flag.String("web.ssl-cert-file", "", "Path to SSL certificate file.")
 	sslKeyFileF  = flag.String("web.ssl-key-file", "", "Path to SSL key file.")
+
+	sslCertFileFKingpin = kingpin.Flag("web.ssl-cert-file", "Path to SSL certificate file.").Default("").String()
+	sslKeyFileFKingpin  = kingpin.Flag("web.ssl-key-file", "Path to SSL key file.").Default("").String()
 
 	landingPage = template.Must(template.New("home").Parse(strings.TrimSpace(`
 <html>
@@ -59,6 +63,36 @@ func RunServer(name, addr, path string, errorHandling promhttp.HandlerErrorHandl
 		}
 		if _, err := os.Stat(*sslKeyFileF); os.IsNotExist(err) {
 			log.Fatalf("SSL key file does not exist: %s", *sslKeyFileF)
+		}
+		ssl = true
+	}
+
+	handler := handler(errorHandling)
+	var buf bytes.Buffer
+	data := map[string]string{"name": name, "path": path}
+	if err := landingPage.Execute(&buf, data); err != nil {
+		log.Fatal(err)
+	}
+
+	if ssl {
+		runHTTPS(addr, path, handler, buf.Bytes())
+	} else {
+		runHTTP(addr, path, handler, buf.Bytes())
+	}
+}
+
+func RunServer2(name, addr, path string, errorHandling promhttp.HandlerErrorHandling) {
+	if (*sslCertFileFKingpin == "") != (*sslKeyFileFKingpin == "") {
+		log.Fatal("One of the flags --web.ssl-cert-file or --web.ssl-key-file is missing to enable HTTPS.")
+	}
+
+	ssl := false
+	if *sslCertFileFKingpin != "" && *sslKeyFileFKingpin != "" {
+		if _, err := os.Stat(*sslCertFileFKingpin); os.IsNotExist(err) {
+			log.Fatalf("SSL certificate file does not exist: %s", *sslCertFileFKingpin)
+		}
+		if _, err := os.Stat(*sslKeyFileFKingpin); os.IsNotExist(err) {
+			log.Fatalf("SSL key file does not exist: %s", *sslKeyFileFKingpin)
 		}
 		ssl = true
 	}
