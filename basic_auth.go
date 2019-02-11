@@ -17,6 +17,7 @@ package exporter_shared
 import (
 	"crypto/subtle"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/log"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"gopkg.in/yaml.v2"
 )
 
@@ -34,6 +36,11 @@ var (
 		"Path to YAML file with server_user, server_password keys for HTTP Basic authentication "+
 			"(overrides HTTP_AUTH environment variable).",
 	)
+	authFileFKingpin = kingpin.Flag(
+		"web.auth-file",
+		"Path to YAML file with server_user, server_password keys for HTTP Basic authentication "+
+			"(overrides HTTP_AUTH environment variable).",
+	).Default("").String()
 )
 
 // basicAuth combines username and password.
@@ -54,6 +61,15 @@ func readBasicAuth() *basicAuth {
 		}
 		if err = yaml.Unmarshal(bytes, &auth); err != nil {
 			log.Fatalf("cannot parse auth file %q: %s", *authFileF, err)
+		}
+	case *authFileFKingpin != "":
+		fmt.Println("!!!!!!!!!!!!")
+		bytes, err := ioutil.ReadFile(*authFileFKingpin)
+		if err != nil {
+			log.Fatalf("cannot read auth file %q: %s", *authFileFKingpin, err)
+		}
+		if err = yaml.Unmarshal(bytes, &auth); err != nil {
+			log.Fatalf("cannot parse auth file %q: %s", *authFileFKingpin, err)
 		}
 	case httpAuth != "":
 		data := strings.SplitN(httpAuth, ":", 2)
